@@ -1,6 +1,13 @@
-package org.example;
+package de.brights.databases.jdbc;
+
+import de.brights.databases.jdbc.entity.City;
+import de.brights.databases.jdbc.entity.Country;
 
 import java.sql.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class JDBCExample {
 
@@ -68,17 +75,29 @@ public class JDBCExample {
     }
 
     // Method to find all cities in a given country
-    public void findCitiesByCountry(String countryName) {
+    public List<City> findCitiesByCountry(String countryName) {
+        List<City> cities = new ArrayList<>();
         try {
             String sql = "SELECT * FROM city WHERE CountryCode = ?";
             PreparedStatement preparedStatement = connection.prepareStatement(sql);
             preparedStatement.setString(1, countryName);
             ResultSet resultSet = preparedStatement.executeQuery();
 
-            printCity(resultSet);
+            while (resultSet.next()) {
+                int id = resultSet.getInt("ID");
+                String name = resultSet.getString("Name");
+                String country = resultSet.getString("CountryCode");
+                String district = resultSet.getString("district");
+                String population = resultSet.getString("population");
+
+                cities.add(new City(id, name, country, district, population));
+            }
+
         } catch (SQLException e) {
             e.printStackTrace();
         }
+
+        return cities;
     }
 
     // Close the database connection
@@ -96,7 +115,6 @@ public class JDBCExample {
         JDBCExample main = new JDBCExample();
         main.connect();
 
-        // Execute the methods
         System.out.println("All Countries:");
         main.printAllCountries();
 
@@ -106,7 +124,42 @@ public class JDBCExample {
         System.out.println("\nCities in a Given Country (e.g., 'USA'):");
         main.findCitiesByCountry("USA");
 
-        // Close the connection when done
+        System.out.println("\nCountries for a continent (e.g., 'Europe'):");
+        List<Country> countries = main.getCountryBy("Europe");
+        System.out.println(countries);
+
         main.closeConnection();
+    }
+
+    private static List<Country> getCountryBy(String continent) {
+        Map<String, Country> countries = new HashMap<>();
+
+        try {
+            String sql = "SELECT * FROM country JOIN city ON country.code = city.countryCode WHERE country.continent = ?";
+            PreparedStatement preparedStatement = connection.prepareStatement(sql);
+            preparedStatement.setString(1, continent);
+            ResultSet resultSet = preparedStatement.executeQuery();
+
+            while (resultSet.next()) {
+                String countryName = resultSet.getString("country.name");
+                String cont = resultSet.getString("country.continent");
+                String region = resultSet.getString("country.region");
+
+                int id = resultSet.getInt("city.ID");
+                String name = resultSet.getString("city.Name");
+                String code = resultSet.getString("city.CountryCode");
+                String district = resultSet.getString("city.district");
+                String population = resultSet.getString("city.population");
+
+                countries.putIfAbsent(countryName, new Country(countryName, cont, region));
+                Country country = countries.get(countryName);
+                country.getCities().add(new City(id, name, countryName, district, population));
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return new ArrayList<>(countries.values());
+
     }
 }
